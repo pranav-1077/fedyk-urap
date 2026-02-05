@@ -7,9 +7,10 @@ A Python utility that augments JSON records containing location data with geogra
 **Key features:**
 - Global geocoding via Google Maps API
 - MSA enrichment for US locations via Geocodio API
+- Rule-based location parsing (city, state, country)
 - Memory-efficient streaming with ijson for large files
-- Avoid making repeat API requests for duplicate locations by tracking unique locations only 
-- Parallelized API requests with rate limiting (40 req/sec)
+- Avoid making repeat API requests for duplicate locations by tracking unique locations only
+- Parallelized API requests with rate limiting
 - Generates MSA-year count aggregations for panel data analysis
 
 ## Codebase Structure
@@ -56,7 +57,7 @@ fedyk-urap-takehome/
 ### Rate Limiting
 
 - Google Maps: 40 requests/second (enforced via `@limits` decorator)
-- Geocodio: Called only for US addresses (locations ending in "United States")
+- Geocodio: 15 requests/second (called only for US addresses)
 
 ## Setup & How to Run
 
