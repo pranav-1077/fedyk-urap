@@ -61,7 +61,7 @@ fedyk-urap-takehome/
 ## Setup & How to Run
 
 ### 1. Create virtual environment
-
+python version: 3.12.0
 ```bash
 python3 -m venv venv
 source venv/bin/activate
