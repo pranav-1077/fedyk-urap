@@ -1,0 +1,5 @@
+ijson
+googlemaps
+requests
+python-dotenv
+ratelimit
