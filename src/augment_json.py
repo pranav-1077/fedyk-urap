@@ -27,6 +27,11 @@ def parse_location(location):
     Returns:
     string of location information
     """
+    # if full address provided use full address
+    if 'raw' in location:
+        if location['raw'][0].isdigit():
+            return location['raw']
+    # otherwise use city, state, country parsing based on availability
     if 'city' in location:
         if 'state' in location and 'country' in location:
             return f"{location['city']}, {location['state']}, {location['country']}"
@@ -130,6 +135,8 @@ def request_locations(locations, count_mapping):
 
     return coord_mapping, msa_year_counts
 
+@sleep_and_retry
+@limits(calls=15, period=1)
 def get_msa_from_coords(lat, lon):
     """
     Get MSA data from Geocodio using reverse geocoding (direct API call).
