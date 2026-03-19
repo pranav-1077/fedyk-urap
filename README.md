@@ -16,7 +16,7 @@ A Python utility that augments JSON records containing location data with geogra
 ## Codebase Structure
 
 ```
-fedyk-urap-takehome/
+fedyk-urap/
 ├── data/
 │   ├── sample_1000_20240401.json   # Input data
 │   ├── augmented-sample.json       # Output: augmented records
