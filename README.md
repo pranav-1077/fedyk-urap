@@ -30,18 +30,6 @@ fedyk-urap-takehome/
 
 ## Implementation Details
 
-### Data Flow
-
-1. **`collect_locations()`** - Streams input JSON, extracts unique locations from `loc` and `exp` fields, builds location-year count mapping
-
-2. **`request_locations()`** - Parallelized geocoding via ThreadPoolExecutor, calls `encode_location()` for each unique location
-
-3. **`encode_location()`** - Rate-limited (40/sec), calls Google Maps for lat/lon, then Geocodio for MSA on US addresses
-
-4. **`augment_json()`** - Streams input again, adds coordinates/MSA to each record, writes to output
-
-5. **`write_msa_year_counts()`** - Converts MSA-year counts to nested dict, writes to JSON
-
 ### Key Functions
 
 | Function | Purpose |
