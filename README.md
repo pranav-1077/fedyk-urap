@@ -1,89 +1,63 @@
 # Location Data Augmentation Pipeline
 
-## Overview
+Augments JSON profile records with geographic coordinates and optionally enriches US locations with MSA (Metropolitan Statistical Area) data.
 
-A Python utility that augments JSON records containing location data with geographic coordinates and Metropolitan Statistical Area (MSA) information. The pipeline processes professional profile data, geocodes locations globally using Google Maps, and enriches US locations with MSA data via Geocodio.
-
-**Key features:**
-- Global geocoding via Google Maps API
-- MSA enrichment for US locations via Geocodio API
-- Rule-based location parsing (city, state, country)
-- Memory-efficient streaming with ijson for large files
-- Avoid making repeat API requests for duplicate locations by tracking unique locations only
-- Parallelized API requests with rate limiting
-- Generates MSA-year count aggregations for panel data analysis
-
-## Codebase Structure
+## Pipeline
 
 ```
-fedyk-urap/
-├── data/
-│   ├── sample_1000_20240401.json   # Input data
-│   ├── augmented-sample.json       # Output: augmented records
-│   └── msa-year-counts.json        # Output: MSA panel data
-├── src/
-│   └── augment_json.py             # Main script
-├── requirements.txt
-├── .env.example
-└── README.md
+augment_json.py          get_msa.py (optional)
+     │                        │
+     ▼                        ▼
+collect unique          read augmented JSON
+locations from     ──►  + location-year counts
+input JSON              look up MSA via Geocodio
+     │                        │
+geocode via                   ▼
+Nominatim              msa-year-counts.json
+     │
+     ▼
+augmented-sample.json
+location-year-counts.json
 ```
 
-## Implementation Details
+**Step 1** streams the input, geocodes each unique location once via Nominatim (free, ~1 req/s), and writes coordinates into the records.
+**Step 2** is run separately when MSA data is needed — it reads Step 1's output and reverse-geocodes US coordinates via Geocodio (parallelized, up to 15 req/s).
 
-### Key Functions
-
-| Function | Purpose |
-|----------|---------|
-| `parse_location()` | Formats location dict to string (city, state, country) |
-| `collect_locations()` | Extracts unique locations + builds year counts |
-| `encode_location()` | Geocodes single location (Google Maps + Geocodio) |
-| `get_msa_from_coords()` | Reverse geocodes coordinates to get MSA |
-| `request_locations()` | Orchestrates parallel geocoding |
-| `augment_json()` | Writes augmented JSON with coordinates |
-| `write_msa_year_counts()` | Writes MSA panel data |
-
-### Rate Limiting
-
-- Google Maps: 40 requests/second (enforced via `@limits` decorator)
-- Geocodio: 15 requests/second (called only for US addresses)
-
-## Setup & How to Run
-
-### 1. Create virtual environment
-python version: 3.12.0
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 2. Install dependencies
+## Setup
 
 ```bash
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env   # add GEOCODIO_API_KEY (only needed for get_msa.py)
 ```
 
-### 3. Configure API keys
+## Configuration
+
+All paths and API settings live in `src/config.py`. API keys are loaded from `.env` at import time.
+
+## Run
 
 ```bash
-cp .env.example .env
-```
-
-Edit `.env` with your API keys:
-```
-GOOGLE_API_KEY=your_google_maps_api_key
-GEOCODIO_API_KEY=your_geocodio_api_key
-```
-
-- Google Maps API: [Google Cloud Console](https://console.cloud.google.com/) (enable Geocoding API)
-- Geocodio API: [dash.geocod.io](https://dash.geocod.io) (2,500 free lookups/day)
-
-### 4. Run
-
-```bash
+# Step 1: geocode all locations
 python src/augment_json.py
+
+# Step 2: MSA enrichment (optional)
+python src/get_msa.py
 ```
 
-### Output
+## File Structure
 
-- `data/augmented-sample.json` - Input records with added `lat`, `lon`, `msa_name`, `msa_code` fields
-- `data/msa-year-counts.json` - Aggregated counts by MSA and year
+```
+├── src/
+│   ├── config.py                       # Paths, API keys, and settings
+│   ├── utils.py                        # Shared parsing and logging utilities
+│   ├── augment_json.py                 # Step 1
+│   └── get_msa.py                      # Step 2
+├── input_data/
+│   └── sample_1000_20240401.json       # Input
+├── output_data/
+│   ├── augmented-sample.json           # Output: records with lat/lon
+│   ├── location-year-counts.json       # Intermediate: for get_msa.py
+│   └── msa-year-counts.json            # Output: MSA panel data
+└── requirements.txt
+```

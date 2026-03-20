@@ -1,5 +1,6 @@
 ijson
-googlemaps
+geopy
 requests
 python-dotenv
 ratelimit
+certifi
