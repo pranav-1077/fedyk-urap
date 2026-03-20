@@ -47,16 +47,21 @@ def parse_year(date_str):
     date_str: date string in "YYYY", "YYYY-MM", "YYYY-MM-DD", or "Month YYYY" format
 
     Returns:
-    integer year
+    integer year, or None if date_str is None or unparseable
     """
-    # input format "YYYY"
-    if '-' not in date_str and ' ' not in date_str:
-        return int(date_str)
-    # input format "YYYY-MM" or "YYYY-MM-DD"
-    if '-' in date_str:
-        return int(date_str.split('-')[0])
-    # input format "Month YYYY"
-    return int(date_str.split(' ')[-1])
+    if not date_str:
+        return None
+    try:
+        # input format "YYYY"
+        if '-' not in date_str and ' ' not in date_str:
+            return int(date_str)
+        # input format "YYYY-MM" or "YYYY-MM-DD"
+        if '-' in date_str:
+            return int(date_str.split('-')[0])
+        # input format "Month YYYY"
+        return int(date_str.split(' ')[-1])
+    except (ValueError, IndexError):
+        return None
 
 
 def parse_location(location):
@@ -69,19 +74,14 @@ def parse_location(location):
     Returns:
     location string with available fields joined by commas
     """
-    # take full location string if available
-    if 'raw' in location:
-        if location['raw'][0].isdigit():
-            return location['raw']
-    # return either (city, state, country) or (city, country)
+    # prefer structured fields for Nominatim API 
     if 'city' in location:
         if 'state' in location and 'country' in location:
             return f"{location['city']}, {location['state']}, {location['country']}"
-        else:
-            return f"{location['city']}, {location['country']}"
-    # return (state, country)
-    elif 'state' in location:
+        return f"{location['city']}, {location['country']}"
+    if 'state' in location:
         return f"{location['state']}, {location['country']}"
-    # return country
-    else:
-        return f"{location['country']}"
+    if 'country' in location:
+        return location['country']
+    # fallback: no structured fields -> use raw as-is
+    return location.get('raw', '')

@@ -40,6 +40,8 @@ def collect_locations():
                 if 'start' in curr_exp and 'end' in curr_exp:
                     start_yr = parse_year(curr_exp['start'])
                     end_yr   = parse_year(curr_exp['end'])
+                    if start_yr is None or end_yr is None:
+                        continue
                     if curr_loc not in count_mapping:
                         count_mapping[curr_loc] = {}
                     for yr in range(start_yr, end_yr + 1):
