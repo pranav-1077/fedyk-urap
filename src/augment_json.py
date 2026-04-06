@@ -5,10 +5,24 @@ optional downstream MSA enrichment (see get_msa.py)
 """
 
 import json
+import time
 import ijson
 from utils import get_logger, parse_location, parse_year
 from config import *
 logger = get_logger(__name__)
+
+
+def _load_cache():
+    try:
+        with open(GEOCODE_CACHE_PATH, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+
+def _save_cache(cache):
+    with open(GEOCODE_CACHE_PATH, 'w') as f:
+        json.dump(cache, f)
 
 
 def collect_locations():
@@ -39,7 +53,7 @@ def collect_locations():
                 # parse time info from exp array entry
                 if 'start' in curr_exp and 'end' in curr_exp:
                     start_yr = parse_year(curr_exp['start'])
-                    end_yr   = parse_year(curr_exp['end'])
+                    end_yr = parse_year(curr_exp['end'])
                     if start_yr is None or end_yr is None:
                         continue
                     if curr_loc not in count_mapping:
@@ -52,7 +66,8 @@ def collect_locations():
 
 def request_locations(locations):
     """
-    Geocodes all unique locations serially via Nominatim
+    Geocodes all unique locations serially via Nominatim, skipping cache hits.
+    New results are merged into the cache and persisted to disk.
 
     Arguments:
     locations: sorted list of unique location strings
@@ -60,9 +75,13 @@ def request_locations(locations):
     Returns:
     coord_mapping: dict of {location: {lat, lon, formatted_address, country_code}}
     """
-    coord_mapping = {}
+    cache = _load_cache()
+    coord_mapping = dict(cache)  # seed with all cached entries
 
-    for loc in locations:
+    misses = [loc for loc in locations if loc not in cache]
+    print(f"  cache hits: {len(locations) - len(misses)}/{len(locations)}  |  to geocode: {len(misses)}")
+
+    for loc in misses:
         try:
             result = geocode(loc)
             if result is None:
@@ -77,6 +96,7 @@ def request_locations(locations):
         except Exception as e:
             logger.error("Geocoding failed for '%s': %s", loc, e)
 
+    _save_cache(coord_mapping)
     return coord_mapping
 
 
@@ -121,6 +141,8 @@ def augment_json(coord_mapping):
 
 
 def main():
+    t_start = time.perf_counter()
+
     # parse locations from input json
     locations, count_mapping = collect_locations()
 
@@ -135,6 +157,13 @@ def main():
     }
     with open(LOCATION_YEAR_COUNTS_PATH, 'w') as f:
         json.dump(serializable, f)
+
+    elapsed = time.perf_counter() - t_start
+    n = len(locations)
+    avg_speed = n / elapsed if elapsed > 0 else float('inf')
+    print(f"\n  total time : {elapsed:.2f}s")
+    print(f"  locations  : {n}")
+    print(f"  avg speed  : {avg_speed:.1f} locations/s")
 
 
 if __name__ == "__main__":

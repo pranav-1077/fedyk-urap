@@ -4,3 +4,6 @@ requests
 python-dotenv
 ratelimit
 certifi
+rapidfuzz
+geonamescache
+pycountry
