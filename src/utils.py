@@ -5,6 +5,7 @@ Shared utilities: logging setup and location parsing
 import logging
 from pathlib import Path
 from datetime import date
+from functools import lru_cache
 from rapidfuzz import process as fuzz_process
 from config import *
 
@@ -110,12 +111,19 @@ def parse_location(location):
     - 1 comma part  → country
     - 2 comma parts → classify first part as city or state by fuzzy score
     """
-    city = location.get('city')
-    state = location.get('state')
-    country = location.get('country')
-    raw = location.get('raw', '')
+    return _parse_location(
+        location.get('city'),
+        location.get('state'),
+        location.get('country'),
+        location.get('raw', '') or '',
+    )
 
-    # 1. city + (state +) country in structured fields
+
+@lru_cache(maxsize=None)
+def _parse_location(city, state, country, raw):
+    """helper function with hashable input for location parsing"""
+
+    # city + (state +) country in structured fields
     if city and country:
         if state:
             return f"{spell_correct(city, CITY_NAMES)}, {spell_correct(state, STATE_NAMES)}, {spell_correct(country, COUNTRY_NAMES)}"
@@ -127,25 +135,25 @@ def parse_location(location):
     if len(raw_parts) == 2:
         raw_kind, raw_corrected_first = classify_raw_part(raw_parts[0])
 
-    # 2. city + state + country or city + country from raw
+    # city + state + country or city + country from raw
     if len(raw_parts) == 3:
         return f"{spell_correct(raw_parts[0], CITY_NAMES)}, {spell_correct(raw_parts[1], STATE_NAMES)}, {spell_correct(raw_parts[2], COUNTRY_NAMES)}"
     if len(raw_parts) == 2 and raw_kind == 'city':
         return f"{raw_corrected_first}, {spell_correct(raw_parts[1], COUNTRY_NAMES)}"
 
-    # 3. state + country in structured fields
+    # state + country in structured fields
     if state and country:
         return f"{spell_correct(state, STATE_NAMES)}, {spell_correct(country, COUNTRY_NAMES)}"
 
-    # 4. state + country from raw
+    # state + country from raw
     if len(raw_parts) == 2 and raw_kind == 'state':
         return f"{raw_corrected_first}, {spell_correct(raw_parts[1], COUNTRY_NAMES)}"
 
-    # 5. country in structured fields (no spell correction)
+    # country in structured fields (no spell correction)
     if country:
         return country
 
-    # 6. spell-correct raw as country, or return as-is for unrecognised formats
+    # spell-correct raw as country, or return as-is for unrecognised formats
     if len(raw_parts) == 1:
         return spell_correct(raw_parts[0], COUNTRY_NAMES)
     return raw

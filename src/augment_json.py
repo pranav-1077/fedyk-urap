@@ -16,6 +16,10 @@ from utils import get_logger, get_week_key, parse_location, parse_year
 from config import *
 logger = get_logger(__name__)
 
+# script-specific variables
+last_mapbox_t = 0.0
+mapbox_delay = None 
+
 
 def init_db():
     """Opens the SQLite cache database, enables WAL mode, and creates tables if they don't exist."""
@@ -90,10 +94,6 @@ def write_cache_entry(con, write_lock, loc, result):
             (loc, result['lat'], result['lon'], result['formatted_address'], result['country_code'])
         )
         con.commit()
-
-
-last_mapbox_t = 0.0
-mapbox_delay = None  # seconds; None until first response sets it from X-Rate-Limit-Limit header
 
 
 def call_mapbox(loc, retries=None):
@@ -238,17 +238,18 @@ def request_locations(locations):
         con.close()
         return coord_mapping
 
-    mapbox_count = [0]
+    mapbox_count = 0
     count_lock = threading.Lock()
     nominatim_queue = []
     nominatim_lock = threading.Lock()
     limit_announced = threading.Event()
 
     def try_claim_slot():
+        nonlocal mapbox_count
         with count_lock:
-            if mapbox_count[0] >= remaining:
+            if mapbox_count >= remaining:
                 return False
-            mapbox_count[0] += 1
+            mapbox_count += 1
             return True
 
     def geocode_one(loc):
@@ -276,7 +277,7 @@ def request_locations(locations):
             futures = [executor.submit(geocode_one, loc) for loc in misses]
             for f in as_completed(futures):
                 f.result()
-        save_mapbox_usage(con, write_lock, mapbox_count[0])
+        save_mapbox_usage(con, write_lock, mapbox_count)
 
     if nominatim_queue:
         print(f"  Nominatim fallback : {len(nominatim_queue)} locations")
