@@ -4,8 +4,15 @@ Shared utilities: logging setup and location parsing
 
 import logging
 from pathlib import Path
+from datetime import date
 from rapidfuzz import process as fuzz_process
 from config import *
+
+
+def get_week_key():
+    """Returns the ISO year-week string for today, e.g. '2024-W15'."""
+    iso = date.today().isocalendar()
+    return f"{iso[0]}-W{iso[1]:02d}"
 
 
 def get_logger(name):
@@ -65,13 +72,13 @@ def parse_year(date_str):
         return None
 
 
-def _spell_correct(name, ref_list):
+def spell_correct(name, ref_list):
     """Returns closest match in ref_list if score >= SPELL_THRESHOLD, else name unchanged."""
     result = fuzz_process.extractOne(name.strip(), ref_list, score_cutoff=SPELL_THRESHOLD)
     return result[0] if result else name.strip()
 
 
-def _classify_raw_part(s):
+def classify_raw_part(s):
     """
     Classifies a raw token as 'city' or 'state' by comparing best fuzzy scores
     against CITY_NAMES and STATE_NAMES. Returns (category, corrected_name).
@@ -111,28 +118,28 @@ def parse_location(location):
     # 1. city + (state +) country in structured fields
     if city and country:
         if state:
-            return f"{_spell_correct(city, CITY_NAMES)}, {_spell_correct(state, STATE_NAMES)}, {_spell_correct(country, COUNTRY_NAMES)}"
-        return f"{_spell_correct(city, CITY_NAMES)}, {_spell_correct(country, COUNTRY_NAMES)}"
+            return f"{spell_correct(city, CITY_NAMES)}, {spell_correct(state, STATE_NAMES)}, {spell_correct(country, COUNTRY_NAMES)}"
+        return f"{spell_correct(city, CITY_NAMES)}, {spell_correct(country, COUNTRY_NAMES)}"
 
     # Pre-parse raw once; classify the ambiguous 2-part case up front
     raw_parts = [p.strip() for p in raw.split(',')] if raw else []
     raw_kind = raw_corrected_first = None
     if len(raw_parts) == 2:
-        raw_kind, raw_corrected_first = _classify_raw_part(raw_parts[0])
+        raw_kind, raw_corrected_first = classify_raw_part(raw_parts[0])
 
     # 2. city + state + country or city + country from raw
     if len(raw_parts) == 3:
-        return f"{_spell_correct(raw_parts[0], CITY_NAMES)}, {_spell_correct(raw_parts[1], STATE_NAMES)}, {_spell_correct(raw_parts[2], COUNTRY_NAMES)}"
+        return f"{spell_correct(raw_parts[0], CITY_NAMES)}, {spell_correct(raw_parts[1], STATE_NAMES)}, {spell_correct(raw_parts[2], COUNTRY_NAMES)}"
     if len(raw_parts) == 2 and raw_kind == 'city':
-        return f"{raw_corrected_first}, {_spell_correct(raw_parts[1], COUNTRY_NAMES)}"
+        return f"{raw_corrected_first}, {spell_correct(raw_parts[1], COUNTRY_NAMES)}"
 
     # 3. state + country in structured fields
     if state and country:
-        return f"{_spell_correct(state, STATE_NAMES)}, {_spell_correct(country, COUNTRY_NAMES)}"
+        return f"{spell_correct(state, STATE_NAMES)}, {spell_correct(country, COUNTRY_NAMES)}"
 
     # 4. state + country from raw
     if len(raw_parts) == 2 and raw_kind == 'state':
-        return f"{raw_corrected_first}, {_spell_correct(raw_parts[1], COUNTRY_NAMES)}"
+        return f"{raw_corrected_first}, {spell_correct(raw_parts[1], COUNTRY_NAMES)}"
 
     # 5. country in structured fields (no spell correction)
     if country:
@@ -140,5 +147,5 @@ def parse_location(location):
 
     # 6. spell-correct raw as country, or return as-is for unrecognised formats
     if len(raw_parts) == 1:
-        return _spell_correct(raw_parts[0], COUNTRY_NAMES)
+        return spell_correct(raw_parts[0], COUNTRY_NAMES)
     return raw
