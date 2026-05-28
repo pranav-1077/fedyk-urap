@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 CLAUDE.md
 venv/
+logs/
+output_data/
